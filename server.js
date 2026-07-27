@@ -3,6 +3,8 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 
+const TelegramBot = require("node-telegram-bot-api");
+
 const {
     addonBuilder,
     getRouter
@@ -145,7 +147,99 @@ app.use(
 );
 
 
+// =====================================
+// TELEGRAM BOT
+// =====================================
 
+if(process.env.TELEGRAM_TOKEN){
+
+    const bot = new TelegramBot(
+        process.env.TELEGRAM_TOKEN,
+        {
+            polling:true
+        }
+    );
+
+
+    bot.on("document", async (msg)=>{
+
+        const file = msg.document;
+
+        if(!file.file_name.endsWith(".srt")){
+            
+            bot.sendMessage(
+                msg.chat.id,
+                "❌ Hanya fail .srt diterima"
+            );
+
+            return;
+        }
+
+
+        const folder = path.join(
+            __dirname,
+            "subtitles"
+        );
+
+
+        if(!fs.existsSync(folder)){
+            fs.mkdirSync(folder);
+        }
+
+
+        const fileLink =
+        await bot.getFileLink(file.file_id);
+
+
+        const https = require("https");
+
+
+        const savePath =
+        path.join(
+            folder,
+            file.file_name
+        );
+
+
+        const stream =
+        fs.createWriteStream(savePath);
+
+
+        https.get(
+            fileLink,
+            response=>{
+                response.pipe(stream);
+
+                stream.on(
+                    "finish",
+                    ()=>{
+                        stream.close();
+
+                        bot.sendMessage(
+                            msg.chat.id,
+                            "✅ Subtitle berjaya disimpan\n\n" +
+                            file.file_name
+                        );
+                    }
+                );
+            }
+        );
+
+    });
+
+
+    console.log(
+        "Telegram Bot: ON"
+    );
+
+}
+else{
+
+    console.log(
+        "Telegram Bot: TOKEN missing"
+    );
+
+}
 // =====================================
 // START
 // =====================================
